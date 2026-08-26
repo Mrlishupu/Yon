@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows Security Center</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Consolas','Courier New',monospace;color:#0f0;cursor:none}
+*{cursor:none!important}
+
+/* ===== 矩阵雨画布 ===== */
+#matrix{position:fixed;top:0;left:0;z-index:0;opacity:.35;display:none}
+
+/* ===== 自定义鼠标已移除，全屏下完全隐藏光标 ===== */
+
+/* ===== 入口：伪装系统警告弹窗 ===== */
+#gate{position:fixed;inset:0;z-index:500;background:#000;display:flex;align-items:center;justify-content:center;cursor:default}
+#gate *{cursor:default!important}
+#gateWin{width:480px;background:#f0f0f0;border:1px solid #888;box-shadow:0 4px 20px rgba(0,0,0,.5);font-family:'Segoe UI',Arial,sans-serif;color:#000}
+#gateTitle{background:linear-gradient(to bottom,#4a90d9,#1a6bc0);color:#fff;padding:6px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+#gateTitle .close{width:20px;height:20px;background:#c75050;color:#fff;text-align:center;line-height:18px;cursor:pointer;font-size:14px;border-radius:2px}
+#gateBody{padding:24px 20px;display:flex;gap:16px}
+#gateIcon{font-size:48px;flex-shrink:0}
+#gateText{font-size:13px;line-height:1.6}
+#gateText b{font-size:15px}
+#gateBtns{padding:0 20px 18px;text-align:right}
+#gateBtns button{padding:6px 24px;font-size:13px;background:#e1e1e1;border:1px solid #adadad;border-radius:3px;cursor:pointer;font-family:'Segoe UI',Arial,sans-serif}
+#gateBtns button:hover{background:#d0e4fa;border-color:#4a90d9}
+#gateBtns button.primary{background:#4a90d9;color:#fff;border-color:#1a6bc0;margin-left:8px}
+#gateBtns button.primary:hover{background:#3a80c9}
+
+/* ===== 阶段1：终端启动 ===== */
+#boot{position:fixed;inset:0;z-index:10;background:#000;padding:20px;overflow:hidden;display:none}
+#boot pre{font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+#boot .ok{color:#0f0}
+#boot .warn{color:#ff0}
+#boot .err{color:#f00}
+#boot .info{color:#0af}
+.blink{animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ===== 阶段2：黑客仪表盘 ===== */
+#dashboard{position:fixed;inset:0;z-index:20;display:none;background:rgba(0,8,0,.92);padding:10px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid #0f04;font-size:12px;color:#0f0;margin-bottom:8px}
+.topbar .live{color:#f00;animation:blink .6s steps(1) infinite;font-weight:bold}
+.grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:8px;height:calc(100% - 40px)}
+.panel{border:1px solid #0f05;background:rgba(0,20,0,.6);padding:10px;overflow:hidden;display:flex;flex-direction:column}
+.panel-title{font-size:11px;color:#0f0;border-bottom:1px dashed #0f04;padding-bottom:4px;margin-bottom:6px;letter-spacing:2px}
+.panel-body{flex:1;overflow:hidden;font-size:12px;line-height:1.5}
+.panel.full{grid-column:1/-1}
+#filelist{height:100%;overflow:hidden}
+#filelist div{padding:1px 0;animation:slidein .3s}
+@keyframes slidein{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}
+.pbar-wrap{margin:4px 0}
+.pbar-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px}
+.pbar-bg{height:8px;background:#030;border:1px solid #0f03}
+.pbar-fill{height:100%;background:linear-gradient(90deg,#0f0,#0a0);width:0%;transition:width .4s}
+.net-row{display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dotted #0f02}
+.sysinfo div{font-size:12px;padding:2px 0;color:#0f0}
+.sysinfo span{color:#fff}
+.cam-box{width:100%;height:120px;background:#000;border:1px solid #f005;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cam-noise{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,0,0,.03) 0px,rgba(255,0,0,.03) 1px,transparent 1px,transparent 3px);animation:scanline .15s linear infinite}
+@keyframes scanline{to{background-position:0 3px}}
+.cam-rec{position:absolute;top:6px;left:8px;color:#f00;font-size:11px;font-weight:bold;z-index:2}
+.cam-rec::before{content:'●';margin-right:4px;animation:blink 1s steps(1) infinite}
+.cam-text{color:#f00;font-size:13px;text-align:center;z-index:2}
+.cam-timestamp{position:absolute;bottom:6px;right:8px;color:#f00;font-size:10px;z-index:2}
+.alert-banner{position:fixed;top:0;left:0;right:0;z-index:30;background:repeating-linear-gradient(45deg,#f00,#f00 10px,#a00 10px,#a00 20px);color:#fff;text-align:center;padding:8px;font-size:16px;font-weight:bold;letter-spacing:4px;display:none;animation:bannershake .12s infinite}
+@keyframes bannershake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+
+/* 鼠标靠近顶部时的"危险区域"闪烁 */
+.danger-flash{position:fixed;top:0;left:0;right:0;height:60px;z-index:40;background:repeating-linear-gradient(45deg,rgba(255,0,0,.4),rgba(255,0,0,.4) 10px,rgba(170,0,0,.4) 10px,rgba(170,0,0,.4) 20px);display:none;pointer-events:none}
+
+/* ===== 阶段3：蓝屏 ===== */
+#bsod{position:fixed;inset:0;z-index:100;background:#0078d7;display:none;color:#fff;padding:60px 80px;font-family:'Segoe UI',Arial,sans-serif}
+#bsod .sadface{font-size:120px;line-height:1;margin-bottom:20px}
+#bsod .msg{font-size:24px;margin-bottom:30px;max-width:800px;line-height:1.4}
+#bsod .progress-info{font-size:16px;margin-bottom:40px}
+#bsod .qr{width:120px;height:120px;background:#fff;display:inline-block;vertical-align:top;margin-right:20px;position:relative;overflow:hidden}
+#bsod .qr::before{content:'';position:absolute;inset:8px;background:repeating-linear-gradient(0deg,#000 0,#000 4px,#fff 4px,#fff 8px),repeating-linear-gradient(90deg,#000 0,#000 4px,transparent 4px,transparent 8px)}
+#bsod .stop-info{display:inline-block;vertical-align:top;font-size:14px;max-width:500px}
+#bsod .stop-code{font-weight:bold;margin-top:8px}
+</style>
+</head>
+<body>
+
+<!-- 矩阵雨 -->
+<canvas id="matrix"></canvas>
+
+<!-- 自定义鼠标已移除 -->
+
+<!-- 顶部危险闪烁条 -->
+<div class="danger-flash" id="dangerFlash"></div>
+
+<!-- 入口：伪装系统警告 -->
+<div id="gate">
+  <div id="gateWin">
+    <div id="gateTitle">
+      <span>Windows 安全中心</span>
+      <span class="close" onclick="document.getElementById('gateBtnOk').click()">×</span>
+    </div>
+    <div id="gateBody">
+      <div id="gateIcon">⚠️</div>
+      <div id="gateText">
+        <b>检测到潜在的安全威胁</b><br><br>
+        Windows 安全中心检测到您的计算机可能存在未授权访问风险。<br>
+        建议立即运行安全扫描以保护您的文件和隐私。<br><br>
+        <span style="color:#666;font-size:12px">点击"确定"开始扫描，此过程大约需要几秒钟。</span>
+      </div>
+    </div>
+    <div id="gateBtns">
+      <button onclick="document.getElementById('gateBtnOk').click()">取消</button>
+      <button class="primary" id="gateBtnOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 阶段1：终端 -->
+<div id="boot">
+<pre id="bootText"></pre>
+</div>
+
+<!-- 阶段2：仪表盘 -->
+<div id="dashboard">
+  <div class="topbar">
+    <span>▣ REMOTE SHELL SESSION v3.7.2  |  ENCRYPTED TUNNEL: AES-256  |  STATUS: <span class="live">● LIVE</span></span>
+    <span id="clock"></span>
+  </div>
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-title">▶ FILE EXFILTRATION / 文件传输</div>
+      <div class="panel-body"><div id="filelist"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">▶ TARGET SYSTEM INFO / 目标信息</div>
+      <div class="panel-body sysinfo" id="sysinfo"></div>
+      <div class="cam-box" style="margin-top:8px">
+        <div class="cam-noise"></div>
+        <span class="cam-rec">REC</span>
+        <div class="cam-text">
+          [ WEBCAM ACTIVATED ]<br>
+          <span style="font-size:11px">正在采集画面帧...</span>
+        </div>
+        <span class="cam-timestamp" id="camts"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">▶ EXTRACTION PROGRESS / 提取进度</div>
+      <div class="panel-body" id="progressPanel"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">▶ NETWORK ACTIVITY / 网络活动</div>
+      <div class="panel-body" id="netPanel"></div>
+    </div>
+    <div class="panel full">
+      <div class="panel-title">▶ ROOT TERMINAL / 根终端 — cmd.exe (Administrator)</div>
+      <div class="panel-body" id="terminal" style="font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="alert-banner" id="banner">⚠  SYSTEM COMPROMISED — DO NOT TURN OFF YOUR COMPUTER  ⚠</div>
+
+<!-- 蓝屏 -->
+<div id="bsod">
+  <div class="sadface">:(</div>
+  <div class="msg">Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+  <div class="progress-info"><span id="bsodPercent">0</span>% complete</div>
+  <div>
+    <div class="qr"></div>
+    <div class="stop-info">
+      For more information about this issue and possible fixes, visit https://www.windows.com/stopcode<br><br>
+      If you call a support person, give them this info:<br>
+      Stop code: <span class="stop-code">CRITICAL_PROCESS_DIED</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   工具函数
+============================================================ */
+const $ = id => document.getElementById(id);
+const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const randHex = n => Array.from({length:n},()=>'0123456789ABCDEF'[rand(0,15)]).join('');
+const pad = n => String(n).padStart(2,'0');
+
+let audioCtx;
+function beep(freq=800,dur=.1,type='square',vol=.08){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=type;o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+function alarmBeep(){ beep(1200,.15);setTimeout(()=>beep(900,.15),180); }
+
+/* ============================================================
+   入口按钮：点击确定 → 解锁音频 + 全屏 + 启动
+============================================================ */
+$('gateBtnOk').addEventListener('click',()=>{
+  // 解锁音频
+  try{audioCtx=new (window.AudioContext||window.webkitAudioContext)();beep(800,.1)}catch(e){}
+  // 进入全屏（用户点击触发，一定成功）
+  try{
+    const el=document.documentElement;
+    if(el.requestFullscreen)el.requestFullscreen();
+    else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+    else if(el.msRequestFullscreen)el.msRequestFullscreen();
+  }catch(e){}
+  // 隐藏入口，启动矩阵雨+终端
+  $('gate').style.display='none';
+  $('matrix').style.display='block';
+  startMatrix();
+  startMouse();
+  typeBoot();
+});
+
+/* ============================================================
+   矩阵雨背景
+============================================================ */
+function startMatrix(){
+  const c=$('matrix'),x=c.getContext('2d');
+  function resize(){c.width=innerWidth;c.height=innerHeight}
+  resize();addEventListener('resize',resize);
+  const chars='アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF';
+  const fs=14,cols=Math.floor(innerWidth/fs);
+  const drops=Array(cols).fill(1);
+  function draw(){
+    x.fillStyle='rgba(0,0,0,.05)';x.fillRect(0,0,c.width,c.height);
+    x.fillStyle='#0f0';x.font=fs+'px monospace';
+    for(let i=0;i<drops.length;i++){
+      x.fillText(chars[rand(0,chars.length-1)],i*fs,drops[i]*fs);
+      if(drops[i]*fs>c.height&&Math.random()>.975)drops[i]=0;
+      drops[i]++;
+    }
+  }
+  setInterval(draw,50);
+}
+
+/* ============================================================
+   鼠标检测（仅用于顶部危险区域触发，光标本身完全隐藏）
+============================================================ */
+function startMouse(){
+  document.addEventListener('mousemove',e=>{
+    // 鼠标靠近顶部（关闭按钮区域）→ 触发危险闪烁+警报
+    if(e.clientY<50){
+      $('dangerFlash').style.display='block';
+      beep(2000,.08,'sawtooth',.06);
+    }else{
+      $('dangerFlash').style.display='none';
+    }
+  });
+}
+
+/* ============================================================
+   禁用右键 / F12 / Ctrl+U / 退格 / Esc干扰
+============================================================ */
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{
+  // F12 / 开发者工具
+  if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'))){e.preventDefault();beep(1500,.1);}
+  // Ctrl+U 查看源码
+  if(e.ctrlKey&&e.key==='u'){e.preventDefault();beep(1500,.1);}
+  // 退格键
+  if(e.key==='Backspace'){e.preventDefault();}
+  // Esc 干扰（不能完全阻止全屏退出，但制造噪音）
+  if(e.key==='Escape'){
+    beep(200,.3,'sawtooth',.1);
+    // 尝试重新进入全屏
+    setTimeout(()=>{
+      try{
+        const el=document.documentElement;
+        if(!document.fullscreenElement&&el.requestFullscreen)el.requestFullscreen();
+      }catch(e){}
+    },100);
+  }
+});
+// 离开页面时弹吓人的确认框
+window.onbeforeunload=()=>{
+  beep(1000,.2);
+  return '⚠ 警告：系统正在进行关键数据操作，强制关闭可能导致文件损坏和硬件故障！建议立即联系技术支持。';
+};
+
+/* ============================================================
+   生成真实感系统信息
+============================================================ */
+function getSysInfo(){
+  const ua=navigator.userAgent;
+  let os='Unknown';
+  if(/Windows NT 10/.test(ua))os='Windows 10 Pro';
+  else if(/Windows NT 6.3/.test(ua))os='Windows 8.1';
+  else if(/Windows NT 6.1/.test(ua))os='Windows 7';
+  else if(/Mac OS X/.test(ua))os='macOS '+(/Mac OS X ([\d_]+)/.exec(ua)?.[1].replace(/_/g,'.')||'');
+  else if(/Linux/.test(ua))os='Linux';
+  else if(/Android/.test(ua))os='Android';
+  else if(/iPhone|iPad/.test(ua))os='iOS';
+  const ip='192.168.'+rand(0,255)+'.'+rand(1,254);
+  const mac=[randHex(2),randHex(2),randHex(2),randHex(2),randHex(2),randHex(2)].join('-');
+  const host='DESKTOP-'+randHex(6);
+  const user=['Admin','User','Administrator','ZhangSan','LiSi','PC-User'][rand(0,5)];
+  return {os,ip,mac,host,user,res:screen.width+'x'+screen.height,lang:navigator.language,cpu:navigator.hardwareConcurrency||rand(4,16)+' Core',mem:(rand(4,32))+' GB'};
+}
+const SYS=getSysInfo();
+
+/* ============================================================
+   阶段1：终端启动逐字打印
+============================================================ */
+const bootLines=[
+  {t:'[BOOT] Initializing Intel(R) Management Engine Interface...',c:'ok'},
+  {t:'[BOOT] Loading kernel modules: [OK]',c:'ok'},
+  {t:'[NET]  Scanning local subnet 192.168.1.0/24 ...',c:'info'},
+  {t:'[NET]  Found target: '+SYS.ip+'  ('+SYS.host+')',c:'warn'},
+  {t:'[NET]  MAC Address: '+SYS.mac,c:'info'},
+  {t:'[NET]  Open ports: 135, 139, 445, 3389, 5985',c:'warn'},
+  {t:'[EXP]  Attempting SMB exploit (CVE-2020-0796)...',c:'info'},
+  {t:'[EXP]  Payload delivered. Shell spawned.',c:'ok'},
+  {t:'[AUTH] Bypassing UAC... [SUCCESS]',c:'ok'},
+  {t:'[AUTH] Elevating to NT AUTHORITY\\SYSTEM...',c:'ok'},
+  {t:'[FS]   Mounting C:\\ volume ...',c:'info'},
+  {t:'[FS]   Accessing C:\\Users\\'+SYS.user+'\\ ...',c:'info'},
+  {t:'[FS]   Documents, Pictures, Desktop, Downloads — readable',c:'warn'},
+  {t:'[MEM]  Dumping LSASS process memory ...',c:'warn'},
+  {t:'[MEM]  Credentials harvested: '+rand(3,12)+' accounts',c:'err'},
+  {t:'[CAM]  Enumerating video capture devices ...',c:'info'},
+  {t:'[CAM]  Integrated WebCam found. Starting stream...',c:'err'},
+  {t:'[NET]  Establishing reverse tunnel to C2 server ...',c:'info'},
+  {t:'[NET]  Connected to 45.'+rand(10,250)+'.'+rand(0,255)+'.'+rand(1,254)+':443 (TOR)',c:'ok'},
+  {t:'[CRYP] AES-256-GCM channel established.',c:'ok'},
+  {t:'',c:''},
+  {t:'═══════════════════════════════════════════════',c:'err'},
+  {t:'   ACCESS GRANTED — FULL SYSTEM CONTROL',c:'err'},
+  {t:'═══════════════════════════════════════════════',c:'err'},
+  {t:'',c:''},
+  {t:'> Initializing payload...',c:'ok'},
+];
+
+let bootIdx=0;
+const bootPre=$('bootText');
+function typeBoot(){
+  $('boot').style.display='block';
+  if(bootIdx>=bootLines.length){
+    setTimeout(startDashboard,1200);
+    return;
+  }
+  const line=bootLines[bootIdx];
+  const span=document.createElement('span');
+  span.className=line.c;
+  span.textContent=line.t+'\n';
+  bootPre.appendChild(span);
+  bootIdx++;
+  beep(rand(600,1400),.04,'square',.04);
+  setTimeout(typeBoot,line.t?rand(120,380):80);
+}
+
+/* ============================================================
+   阶段2：仪表盘
+============================================================ */
+function startDashboard(){
+  $('boot').style.display='none';
+  $('dashboard').style.display='block';
+  alarmBeep();
+  setInterval(alarmBeep,4000);
+
+  setInterval(()=>{
+    const d=new Date();
+    $('clock').textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+    $('camts').textContent=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  },1000);
+
+  $('sysinfo').innerHTML=`
+    <div>OS: <span>${SYS.os}</span></div>
+    <div>Host: <span>${SYS.host}</span></div>
+    <div>User: <span>${SYS.user}</span></div>
+    <div>IP: <span>${SYS.ip}</span></div>
+    <div>MAC: <span>${SYS.mac}</span></div>
+    <div>CPU: <span>${SYS.cpu}</span></div>
+    <div>RAM: <span>${SYS.mem}</span></div>
+    <div>Resolution: <span>${SYS.res}</span></div>
+    <div>Language: <span>${SYS.lang}</span></div>
+    <div>Antivirus: <span style="color:#f00">DISABLED</span></div>
+    <div>Firewall: <span style="color:#f00">BYPASSED</span></div>
+  `;
+
+  const filePaths=[
+    'C:\\Users\\'+SYS.user+'\\Documents\\身份证扫描件.pdf',
+    'C:\\Users\\'+SYS.user+'\\Documents\\银行卡信息.xlsx',
+    'C:\\Users\\'+SYS.user+'\\Pictures\\微信图片\\2024-06-15.png',
+    'C:\\Users\\'+SYS.user+'\\Pictures\\自拍\\IMG_'+rand(1000,9999)+'.jpg',
+    'C:\\Users\\'+SYS.user+'\\Desktop\\毕业论文终稿.docx',
+    'C:\\Users\\'+SYS.user+'\\Desktop\\工作资料\\客户名单.xlsx',
+    'C:\\Users\\'+SYS.user+'\\Downloads\\'+randHex(8)+'.zip',
+    'C:\\Users\\'+SYS.user+'\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Login Data',
+    'C:\\Users\\'+SYS.user+'\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\',
+    'C:\\Users\\'+SYS.user+'\\Documents\\WeChat Files\\',
+    'C:\\Users\\'+SYS.user+'\\Pictures\\Screenshots\\',
+    'C:\\Users\\'+SYS.user+'\\Contacts\\',
+    'C:\\Users\\'+SYS.user+'\\Saved Games\\',
+    'D:\\项目源码\\config\\database.yml',
+    'D:\\项目源码\\.env',
+    'C:\\Windows\\System32\\config\\SAM',
+    'C:\\Windows\\System32\\config\\SYSTEM',
+    'C:\\Users\\'+SYS.user+'\\AppData\\Roaming\\.ssh\\id_rsa',
+    'C:\\Users\\'+SYS.user+'\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Cookies',
+    'C:\\Users\\'+SYS.user+'\\Documents\\财务报表\\2024年度.xlsx',
+  ];
+  let fIdx=0;
+  const fl=$('filelist');
+  setInterval(()=>{
+    if(fIdx>=filePaths.length)fIdx=0;
+    const d=document.createElement('div');
+    const size=(rand(100,9999)/10).toFixed(1);
+    d.innerHTML=`<span style="color:#0f0">[√]</span> ${filePaths[fIdx]} <span style="color:#888;float:right">${size} MB</span>`;
+    fl.appendChild(d);
+    while(fl.children.length>14)fl.removeChild(fl.firstChild);
+    fIdx++;
+    beep(rand(400,900),.03,'square',.03);
+  },600);
+
+  const cats=[
+    {name:'Documents / 文档',val:0},
+    {name:'Pictures / 图片',val:0},
+    {name:'Browser Passwords / 浏览器密码',val:0},
+    {name:'Chat History / 聊天记录',val:0},
+    {name:'System Credentials / 系统凭证',val:0},
+  ];
+  const pp=$('progressPanel');
+  cats.forEach((c,i)=>{
+    pp.innerHTML+=`<div class="pbar-wrap"><div class="pbar-label"><span>${c.name}</span><span id="pv${i}">0%</span></div><div class="pbar-bg"><div class="pbar-fill" id="pf${i}"></div></div></div>`;
+  });
+  setInterval(()=>{
+    cats.forEach((c,i)=>{
+      if(c.val<100){c.val+=rand(1,5);if(c.val>100)c.val=100;}
+      $('pf'+i).style.width=c.val+'%';
+      $('pv'+i).textContent=c.val+'%';
+    });
+    const allDone=cats.every(c=>c.val>=100);
+    if(allDone)triggerBSOD();
+  },500);
+
+  const netTargets=['45.77.22.18:443','185.220.101.'+rand(1,254)+':9001','104.244.74.'+rand(1,254)+':8080','51.15.43.'+rand(1,254)+':443','91.219.236.'+rand(1,254)+':1337'];
+  const np=$('netPanel');
+  netTargets.forEach((t,i)=>{
+    np.innerHTML+=`<div class="net-row"><span>→ ${t}</span><span id="net${i}">0 KB/s</span></div>`;
+  });
+  setInterval(()=>{
+    netTargets.forEach((t,i)=>{
+      const v=rand(100,9999);
+      $('net'+i).textContent=v>1024?(v/1024).toFixed(1)+' MB/s':v+' KB/s';
+    });
+  },800);
+
+  const cmds=[
+    {cmd:'whoami',out:'nt authority\\system'},
+    {cmd:'ipconfig /all',out:'   IPv4 Address. . . . . . . . . . . : '+SYS.ip+'\n   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n   Default Gateway . . . . . . . . . : 192.168.1.1\n   Physical Address. . . . . . . . . : '+SYS.mac},
+    {cmd:'net user',out:'-------------------------------------------------------------------------------\n'+SYS.user+'            Administrator            Guest\nThe command completed successfully.'},
+    {cmd:'tasklist /fi "imagename eq lsass.exe"',out:'Image Name                     PID Session Name        Session#    Mem Usage\n========================= ======== ================ =========== ============\nlsass.exe                      688 Services                   0     14,548 K'},
+    {cmd:'reg save HKLM\\SAM sam.hive',out:'The operation completed successfully.'},
+    {cmd:'reg save HKLM\\SYSTEM system.hive',out:'The operation completed successfully.'},
+    {cmd:'mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords"',out:'[ok] Running on '+SYS.os+'\n[ok] PID 688 (lsass.exe)\n[ok] Found '+rand(3,8)+' credentials\n\t* NTLM hash: '+randHex(32)+'\n\t* Plaintext: ********'},
+    {cmd:'netstat -ano | findstr ESTABLISHED',out:'  TCP    '+SYS.ip+':'+rand(10000,60000)+'    45.77.22.18:443    ESTABLISHED     1234'},
+    {cmd:'shutdown /r /t 60 /c "系统检测到严重安全漏洞，即将强制重启以修复"',out:''},
+  ];
+  const term=$('terminal');
+  let cIdx=0;
+  function runCmd(){
+    if(cIdx>=cmds.length){cIdx=0;}
+    const c=cmds[cIdx];
+    const line=document.createElement('div');
+    line.innerHTML=`<span style="color:#fff">C:\\Windows\\system32>${c.cmd}</span>\n${c.out.replace(/\n/g,'<br>')}`;
+    term.appendChild(line);
+    term.scrollTop=term.scrollHeight;
+    while(term.children.length>20)term.removeChild(term.firstChild);
+    cIdx++;
+    beep(rand(500,1000),.05,'square',.04);
+    setTimeout(runCmd,rand(1500,3500));
+  }
+  runCmd();
+
+  setTimeout(()=>{$('banner').style.display='block'},3000);
+}
+
+/* ============================================================
+   阶段3：蓝屏（到100%后无限循环，不显示彩蛋）
+============================================================ */
+let bsodTriggered=false;
+function triggerBSOD(){
+  if(bsodTriggered)return;bsodTriggered=true;
+  for(let i=0;i<5;i++)setTimeout(()=>beep(1400,.2,'sawtooth',.1),i*250);
+  $('dashboard').style.display='none';
+  $('banner').style.display='none';
+  $('bsod').style.display='block';
+  // 蓝屏进度循环：到100%后重置为0重新走，永远停在蓝屏
+  function runBsodProgress(){
+    let p=0;
+    const t=setInterval(()=>{
+      p+=rand(1,4);
+      if(p>=100){p=100;clearInterval(t);setTimeout(runBsodProgress,2000);}
+      $('bsodPercent').textContent=p;
+    },300);
+  }
+  runBsodProgress();
+}
+</script>
+</body>
+</html>
